@@ -1,0 +1,2207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Map</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --bg: #080808;
+    --node-bg: #111111;
+    --node-border: #dd2525;
+    --node-text: #ff6666;
+    --node-hover-bg: #1e0e0e;
+    --node-hover-border: #ff4444;
+    --node-selected-bg: #221010;
+    --line-color: #dd2525;
+    --panel-bg: #0f0f0f;
+    --ui-text: #ff6666;
+    --ui-dim: #bb5555;
+    --tooltip-bg: #0f0505;
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-ui: 'Rajdhani', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ui-text);
+    font-family: var(--font-ui);
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    user-select: none;
+  }
+
+  /* ── TOOLBAR ── */
+  #toolbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 52px;
+    background: #0a0a0aee;
+    border-bottom: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 18px;
+    z-index: 100;
+    backdrop-filter: blur(6px);
+  }
+
+  /* map title rename wrapper */
+  #map-title-wrap {
+    position: relative;
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+  }
+
+  #map-title {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    color: var(--ui-dim);
+    cursor: default;
+    white-space: nowrap;
+  }
+
+  #map-title-input {
+    position: absolute;
+    inset: -4px -6px;
+    background: #0a0303;
+    border: 1px solid var(--node-border);
+    border-radius: 3px;
+    color: var(--ui-text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    padding: 0 6px;
+    outline: none;
+    display: none;
+    z-index: 10;
+    min-width: 100px;
+  }
+
+  /* ── TAB BAR ── */
+  #tab-bar {
+    position: fixed;
+    top: 52px; left: 0; right: 0;
+    height: 36px;
+    background: transparent;
+    border-top: 1px solid #4d2020;
+    border-bottom: 1px solid #4d2020;
+    display: flex;
+    align-items: stretch;
+    z-index: 99;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+    overflow: hidden;
+    min-width: 0;
+    transition: background 0.12s;
+  }
+
+  /* vertical divider between non-active tabs — middle 50% only */
+  .tab:not(.active) + .tab:not(.active)::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 25%;
+    height: 50%;
+    width: 1px;
+    background: #4d2020;
+  }
+
+  /* active tab: U-shape hanging from toolbar, covers the tab-bar top border */
+  .tab.active {
+    background: #0a0a0aee;
+    border-left: 1px solid #4d2020;
+    border-right: 1px solid #4d2020;
+    border-bottom: 1px solid #4d2020;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    margin-top: -1px;
+    padding-bottom: 1px;
+  }
+
+  .tab:not(.active):hover {
+    background: #1a0808;
+  }
+
+  .tab-name {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--ui-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+    pointer-events: none;
+  }
+
+  .tab.active .tab-name {
+    color: var(--ui-text);
+  }
+
+  .tab-close {
+    background: none;
+    border: none;
+    color: var(--ui-dim);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0 0 0 6px;
+    flex-shrink: 0;
+    transition: color 0.15s;
+    pointer-events: all;
+    line-height: 1;
+  }
+
+  .tab-close:hover { color: #ff5555; }
+
+  #btn-add-tab {
+    flex-shrink: 0;
+    width: 40px;
+    height: 100%;
+    background: none;
+    border: none;
+    color: var(--ui-dim);
+    cursor: pointer;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+    padding-bottom: 2px;
+  }
+
+  #btn-add-tab:hover {
+    color: var(--ui-text);
+    background: #1a0808;
+  }
+
+  .tb-btn {
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--ui-text);
+    border: 1px solid var(--node-border);
+    border-radius: 4px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  .tb-btn:hover {
+    background: #221010;
+    border-color: #ff4444;
+    color: #ff6666;
+  }
+
+  .tb-btn.active {
+    background: #321515;
+    border-color: #ff4444;
+    color: #ff6666;
+    box-shadow: 0 0 10px #ff222244;
+  }
+
+  .tb-btn.danger {
+    border-color: #771515;
+    color: #aa3333;
+  }
+  .tb-btn.danger:hover {
+    border-color: #dd1515;
+    color: #ff5555;
+    background: #221010;
+  }
+
+  .tb-sep {
+    width: 1px;
+    height: 24px;
+    background: #331515;
+    margin: 0 4px;
+  }
+
+  #mode-indicator {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ui-dim);
+    letter-spacing: 0.12em;
+  }
+
+  #mode-indicator span {
+    color: var(--ui-text);
+  }
+
+  /* ── CANVAS ── */
+  #viewport {
+    position: fixed;
+    top: 88px; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+    cursor: grab;
+  }
+
+  #viewport.grabbing { cursor: grabbing; }
+  #viewport.connect-mode { cursor: crosshair; }
+
+  #world {
+    position: absolute;
+    width: 6000px;
+    height: 6000px;
+    top: 0; left: 0;
+    transform-origin: 0 0;
+  }
+
+  /* Dot grid background */
+  #world::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(circle, rgba(255,255,255,0.15) 1.5px, transparent 1.5px);
+    background-size: 40px 40px;
+  }
+
+  /* ── SVG LINES ── */
+  #svg-layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .dep-line {
+    stroke: var(--line-color);
+    stroke-width: 1.5;
+    fill: none;
+    filter: drop-shadow(0 0 4px #dd252566);
+  }
+
+  .dep-arrow {
+    fill: #dd2525;
+    filter: drop-shadow(0 0 4px #dd252566);
+  }
+
+  .dep-line-preview {
+    stroke: #ff666688;
+    stroke-width: 1.5;
+    stroke-dasharray: 6 4;
+    fill: none;
+    pointer-events: none;
+  }
+
+  /* ── NODES ── */
+  .node {
+    position: absolute;
+    min-width: 140px;
+    max-width: 200px;
+    padding: 12px 16px;
+    background: var(--node-bg);
+    border: 1.5px solid var(--node-border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    box-shadow: 0 0 12px #dd252522, inset 0 0 20px #0a00001a;
+  }
+
+  .node:hover {
+    background: var(--node-hover-bg);
+    border-color: var(--node-hover-border);
+    box-shadow: 0 0 20px #dd252544, inset 0 0 20px #1a00001a;
+    z-index: 10;
+  }
+
+  .node.selected {
+    background: var(--node-selected-bg);
+    border-color: #ff5555;
+    box-shadow: 0 0 25px #dd252566;
+    z-index: 11;
+  }
+
+  .node.connect-source {
+    border-color: #ff6600;
+    box-shadow: 0 0 25px #ff660066;
+  }
+
+  .node-name {
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: var(--node-text);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  /* ── TOOLTIP ── */
+  #tooltip {
+    position: fixed;
+    background: var(--tooltip-bg);
+    border: 1px solid #5a2525;
+    border-radius: 6px;
+    padding: 8px 12px;
+    max-width: 260px;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    color: #ffaaaa;
+    line-height: 1.5;
+    pointer-events: none;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.15s;
+    box-shadow: 0 4px 20px #00000088;
+  }
+
+  #tooltip.visible { opacity: 1; }
+
+  /* ── DETAIL PANEL ── */
+  #detail-panel {
+    position: fixed;
+    right: 0; top: 88px; bottom: 0;
+    width: 320px;
+    background: var(--panel-bg);
+    border-left: 1px solid #4d2020;
+    transform: translateX(100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #detail-panel.open { transform: translateX(0); }
+
+  #panel-header {
+    padding: 16px 18px 12px;
+    border-bottom: 1px solid #331515;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  #panel-title {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    color: var(--ui-text);
+    line-height: 1.4;
+    flex: 1;
+  }
+
+  #panel-close {
+    background: none;
+    border: none;
+    color: var(--ui-dim);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+  #panel-close:hover { color: var(--ui-text); }
+
+  #panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px;
+    scrollbar-width: thin;
+    scrollbar-color: #4d2020 transparent;
+  }
+
+  .panel-section-label {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    color: var(--ui-dim);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    margin-top: 20px;
+  }
+  .panel-section-label:first-child { margin-top: 0; }
+
+  .panel-text {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: #ff8888;
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  .panel-text.empty { color: #774444; font-style: italic; }
+
+  #panel-deps, #panel-dependents {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .dep-chip {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--node-text);
+    border: 1px solid #5a2020;
+    border-radius: 4px;
+    padding: 4px 10px;
+    background: #0f0505;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dep-chip::before {
+    content: '→';
+    color: var(--ui-dim);
+    flex-shrink: 0;
+  }
+
+  .dep-chip-name {
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80px;
+  }
+
+  .dep-label-input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #4d2020;
+    color: #bb5555;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    outline: none;
+    padding: 1px 4px;
+    transition: border-color 0.15s, color 0.15s;
+    cursor: text;
+  }
+  .dep-label-input:focus {
+    border-bottom-color: var(--node-border);
+    color: var(--ui-text);
+  }
+  .dep-label-input::placeholder { color: #4d2020; }
+
+  .dependent-chip {
+    color: #e8e8e8;
+    border: 1px solid #666666;
+    border-radius: 999px;
+    background: #141414;
+  }
+
+  .dependent-chip::before {
+    content: '←';
+    color: #888888;
+  }
+
+  .dep-remove {
+    background: none;
+    border: none;
+    color: #774444;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
+    transition: color 0.15s;
+  }
+  .dep-remove:hover { color: #dd2525; }
+
+  #panel-footer {
+    padding: 12px 18px;
+    border-top: 1px solid #331515;
+    display: flex;
+    gap: 8px;
+  }
+
+  #panel-footer .tb-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* ── MODAL ── */
+  #modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: #000000cc;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  #modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  #modal {
+    background: #0f0505;
+    border: 1px solid var(--node-border);
+    border-radius: 10px;
+    width: 460px;
+    max-width: 90vw;
+    padding: 24px;
+    box-shadow: 0 0 40px #dd252533;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  #modal h2 {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ui-text);
+  }
+
+  .modal-field label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--ui-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .modal-field input,
+  .modal-field textarea {
+    width: 100%;
+    background: #0a0303;
+    border: 1px solid #5a2020;
+    border-radius: 5px;
+    color: #ffaaaa;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    padding: 8px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    resize: vertical;
+  }
+
+  .modal-field input:focus,
+  .modal-field textarea:focus {
+    border-color: var(--node-border);
+  }
+
+  .modal-field textarea { min-height: 80px; }
+
+  .modal-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+
+  /* ── IMPORT hidden input ── */
+  #import-input { display: none; }
+
+  /* ── SCROLLBARS ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #4d2020; border-radius: 3px; }
+
+  /* ── ZOOM DISPLAY ── */
+  #zoom-display {
+    position: fixed;
+    bottom: 14px;
+    left: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ui-dim);
+    letter-spacing: 0.1em;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  #zoom-display button { pointer-events: all; }
+
+  #hint {
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ui-dim);
+    letter-spacing: 0.1em;
+    z-index: 100;
+    pointer-events: none;
+    text-align: center;
+  }
+
+  /* ── SHORTCUTS DISPLAY ── */
+  #shortcuts {
+    position: fixed;
+    bottom: 40px;
+    left: 14px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ui-dim);
+    letter-spacing: 0.07em;
+    z-index: 100;
+    pointer-events: none;
+    display: grid;
+    grid-template-columns: auto auto;
+    column-gap: 20px;
+    row-gap: 3px;
+    line-height: 1.4;
+  }
+
+  .sc-key {
+    color: var(--ui-text);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .sc-action {
+    color: var(--ui-dim);
+    white-space: nowrap;
+  }
+
+  /* ── COLOR SWATCHES ── */
+  #panel-colors {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 2px 0;
+  }
+
+  .color-swatch {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.15s, border-color 0.15s;
+    padding: 0;
+  }
+  .color-swatch:hover  { transform: scale(1.2); }
+  .color-swatch.active { border-color: rgba(255,255,255,0.45); transform: scale(1.15); }
+
+  /* ── SVG CONNECTION LABELS ── */
+  .dep-label-group text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    fill: #dd2525;
+    letter-spacing: 0.05em;
+  }
+  .dep-label-group rect {
+    fill: #0d0505;
+    stroke: #331010;
+    stroke-width: 0.5;
+  }
+
+  /* ── TOAST NOTIFICATIONS ── */
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  #toast-container {
+    position: fixed;
+    bottom: 50px;
+    right: 20px;
+    width: 270px;
+    height: 144px; /* fits exactly 3 toasts of ~40px + 2 gaps of 8px = 136px, with breathing room */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 8px;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent 0%, black 33%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 33%);
+    pointer-events: none;
+    z-index: 150;
+    transition: right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  #toast-container.panel-open { right: 340px; }
+
+  .toast {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    color: #ffaaaa;
+    background: #1a0808ee;
+    border: 1px solid #551515;
+    border-radius: 6px;
+    padding: 10px 14px;
+    flex-shrink: 0;
+    animation: toastIn 0.2s ease forwards;
+    transition: opacity 0.8s ease;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 12px #00000077;
+  }
+
+  .toast.fading { opacity: 0; }
+</style>
+</head>
+<body>
+
+<!-- TOOLBAR -->
+<div id="toolbar">
+  <div id="map-title-wrap">
+    <span id="map-title">Map 1</span>
+    <input id="map-title-input" type="text" maxlength="40" autocomplete="off">
+  </div>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-add">+ Add Node</button>
+  <button class="tb-btn" id="btn-connect">Connect</button>
+  <button class="tb-btn" id="btn-recenter">Re-center</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-export-png">Export .png</button>
+  <button class="tb-btn" id="btn-export">Export .json</button>
+  <button class="tb-btn" id="btn-import">Import .json</button>
+  <input type="file" id="import-input" accept=".json">
+  <div class="tb-sep"></div>
+  <button class="tb-btn danger" id="btn-clear">Clear All</button>
+  <div id="mode-indicator">MODE: <span id="mode-text">PAN / SELECT</span></div>
+</div>
+
+<!-- TAB BAR -->
+<div id="tab-bar">
+  <button id="btn-add-tab" title="New tab">+</button>
+</div>
+
+<!-- VIEWPORT -->
+<div id="viewport">
+  <div id="world">
+    <svg id="svg-layer"></svg>
+  </div>
+</div>
+
+<!-- TOOLTIP -->
+<div id="tooltip"></div>
+
+<!-- DETAIL PANEL -->
+<div id="detail-panel">
+  <div id="panel-header">
+    <div id="panel-title">—</div>
+    <button id="panel-close">✕</button>
+  </div>
+  <div id="panel-body">
+    <div class="panel-section-label">Description</div>
+    <div class="panel-text" id="panel-desc"></div>
+    <div class="panel-section-label">Logic</div>
+    <div class="panel-text" id="panel-logic"></div>
+    <div class="panel-section-label">Color</div>
+    <div id="panel-colors"></div>
+    <div class="panel-section-label">Dependencies</div>
+    <div id="panel-deps"></div>
+    <div class="panel-section-label">Dependents</div>
+    <div id="panel-dependents"></div>
+  </div>
+  <div id="panel-footer">
+    <button class="tb-btn" id="panel-btn-edit">Edit</button>
+    <button class="tb-btn danger" id="panel-btn-delete">Delete</button>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h2 id="modal-title">Add Node</h2>
+    <div class="modal-field">
+      <label>Name</label>
+      <input type="text" id="field-name" placeholder="System name…" maxlength="60">
+    </div>
+    <div class="modal-field">
+      <label>Description (shown on hover)</label>
+      <textarea id="field-desc" placeholder="Brief description of what this system does…"></textarea>
+    </div>
+    <div class="modal-field">
+      <label>Logic (shown on click)</label>
+      <textarea id="field-logic" placeholder="Detailed rules and logic for this system…" style="min-height:110px"></textarea>
+    </div>
+    <div class="modal-buttons">
+      <button class="tb-btn" id="modal-cancel">Cancel</button>
+      <button class="tb-btn" id="modal-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHORTCUTS -->
+<div id="shortcuts">
+  <span class="sc-key">N</span>             <span class="sc-action">Add Node</span>
+  <span class="sc-key">E</span>             <span class="sc-action">Edit Node</span>
+  <span class="sc-key">Del / Bksp</span>    <span class="sc-action">Delete Node</span>
+  <span class="sc-key">C</span>             <span class="sc-action">Connect Mode</span>
+  <span class="sc-key">R</span>             <span class="sc-action">Re-center</span>
+  <span class="sc-key">F</span>             <span class="sc-action">Zoom to Fit</span>
+  <span class="sc-key">Z</span>             <span class="sc-action">Reset Zoom</span>
+  <span class="sc-key">Shift+Z</span>       <span class="sc-action">Undo</span>
+  <span class="sc-key">Shift+Y</span>       <span class="sc-action">Redo</span>
+  <span class="sc-key">Shift+E</span>       <span class="sc-action">Export .json</span>
+  <span class="sc-key">Shift+P</span>       <span class="sc-action">Export .png</span>
+  <span class="sc-key">Shift+I</span>       <span class="sc-action">Import</span>
+  <span class="sc-key">Shift+T</span>       <span class="sc-action">New Tab</span>
+  <span class="sc-key">Shift+W</span>       <span class="sc-action">Close Tab</span>
+  <span class="sc-key">Shift+←/→</span>    <span class="sc-action">Prev / Next Tab</span>
+  <span class="sc-key">F2</span>            <span class="sc-action">Rename Tab</span>
+  <span class="sc-key">Shift+Del</span>     <span class="sc-action">Clear All</span>
+  <span class="sc-key">Ent</span>           <span class="sc-action">Confirm</span>
+  <span class="sc-key">Esc</span>           <span class="sc-action">Cancel / Close</span>
+</div>
+
+<!-- ZOOM + HINT -->
+<div id="zoom-display">ZOOM: <span id="zoom-val">100</span>% <button class="tb-btn" id="btn-reset-zoom" style="margin-left:8px;padding:3px 10px;font-size:10px;pointer-events:all;">Reset</button></div>
+<div id="hint">Scroll to zoom · Drag background to pan · Hover node for description · Click node for details</div>
+
+<!-- TOAST NOTIFICATIONS -->
+<div id="toast-container"></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+// Color presets for nodes
+const COLOR_PRESETS = [
+  { name: 'Red',    border: '#dd2525', text: '#ff6666' },
+  { name: 'Orange', border: '#cc6600', text: '#ff9933' },
+  { name: 'Gold',   border: '#997700', text: '#ffcc00' },
+  { name: 'Green',  border: '#1a8a1a', text: '#44dd44' },
+  { name: 'Teal',   border: '#0088aa', text: '#22ccee' },
+  { name: 'Blue',   border: '#2244cc', text: '#5588ff' },
+  { name: 'Purple', border: '#882299', text: '#cc44ee' },
+  { name: 'Gray',   border: '#666666', text: '#aaaaaa' },
+];
+
+// Undo / Redo
+const MAX_UNDO = 50;
+let undoStack = [];
+let redoStack = [];
+
+// Tab state
+let tabs = [];
+let activeTabId = null;
+let tabCounter = 1;
+
+// Active tab working state (synced with active tab on switch)
+let nodes = [];
+let connections = [];
+let nextId = 1;
+
+// View state
+let panX = 0, panY = 0, scale = 1;
+let isPanning = false, panStartX = 0, panStartY = 0, panOriginX = 0, panOriginY = 0;
+
+// Interaction state
+let connectMode = false;
+let connectSource = null;
+let selectedNodeId = null;
+let draggingNode = null, dragOffX = 0, dragOffY = 0;
+let dragStartX = 0, dragStartY = 0;
+let pendingUndoSnap = null;
+let mouseWorldX = 0, mouseWorldY = 0;
+
+// DOM refs
+const viewport   = document.getElementById('viewport');
+const world      = document.getElementById('world');
+const svgLayer   = document.getElementById('svg-layer');
+const tooltip    = document.getElementById('tooltip');
+const detailPanel = document.getElementById('detail-panel');
+const modeText   = document.getElementById('mode-text');
+const zoomVal    = document.getElementById('zoom-val');
+const tabBar     = document.getElementById('tab-bar');
+
+// ─────────────────────────────────────────────
+//  TAB MANAGEMENT
+// ─────────────────────────────────────────────
+function saveCurrentTab() {
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab) return;
+  tab.nodes       = nodes.map(n => ({ ...n }));
+  tab.connections = connections.map(c => ({ ...c }));
+  tab.nextId      = nextId;
+  tab.panX        = panX;
+  tab.panY        = panY;
+  tab.scale       = scale;
+  tab.undoStack   = undoStack.map(s => ({
+    nodes:       s.nodes.map(n => ({ ...n })),
+    connections: s.connections.map(c => ({ ...c })),
+    nextId:      s.nextId
+  }));
+  tab.redoStack   = redoStack.map(s => ({
+    nodes:       s.nodes.map(n => ({ ...n })),
+    connections: s.connections.map(c => ({ ...c })),
+    nextId:      s.nextId
+  }));
+}
+
+function loadTabData(tab) {
+  // Clear canvas
+  document.querySelectorAll('.node').forEach(el => el.remove());
+  svgLayer.querySelectorAll('.dep-line, .dep-arrow, .dep-label-group').forEach(e => e.remove());
+  hidePreviewLine();
+  closeDetailPanel();
+  if (connectMode) setConnectMode(false);
+
+  // Restore working state
+  nodes       = tab.nodes.map(n => ({ ...n }));
+  connections = tab.connections.map(c => ({ ...c }));
+  nextId      = tab.nextId;
+  panX        = tab.panX;
+  panY        = tab.panY;
+  scale       = tab.scale;
+  undoStack   = tab.undoStack ? tab.undoStack.map(s => ({
+    nodes:       s.nodes.map(n => ({ ...n })),
+    connections: s.connections.map(c => ({ ...c })),
+    nextId:      s.nextId
+  })) : [];
+  redoStack   = tab.redoStack ? tab.redoStack.map(s => ({
+    nodes:       s.nodes.map(n => ({ ...n })),
+    connections: s.connections.map(c => ({ ...c })),
+    nextId:      s.nextId
+  })) : [];
+
+  nodes.forEach(node => createNodeEl(node));
+  redrawLines();
+  applyTransform();
+
+  document.getElementById('map-title').textContent = tab.name;
+}
+
+function switchTab(tabId) {
+  if (tabId === activeTabId) return;
+  saveCurrentTab();
+  activeTabId = tabId;
+  loadTabData(tabs.find(t => t.id === tabId));
+  renderTabBar();
+}
+
+function createTab(name) {
+  const id = 'tab' + (tabCounter++);
+  const rect = viewport.getBoundingClientRect();
+  const newTab = {
+    id,
+    name: name || `Map ${tabCounter - 1}`,
+    nodes: [], connections: [], nextId: 1,
+    panX: rect.width  / 2 - 3000,
+    panY: rect.height / 2 - 3000,
+    scale: 1,
+    undoStack: [],
+    redoStack: []
+  };
+  saveCurrentTab();
+  tabs.push(newTab);
+  activeTabId = id;
+  loadTabData(newTab);
+  renderTabBar();
+  return id;
+}
+
+function closeTab(tabId) {
+  if (tabs.length <= 1) return;
+  const idx = tabs.findIndex(t => t.id === tabId);
+  tabs = tabs.filter(t => t.id !== tabId);
+  if (activeTabId === tabId) {
+    const newIdx  = Math.min(idx, tabs.length - 1);
+    activeTabId   = tabs[newIdx].id;
+    loadTabData(tabs[newIdx]);
+  }
+  renderTabBar();
+}
+
+function renderTabBar() {
+  // Remove existing tab elements (keep add button)
+  tabBar.querySelectorAll('.tab').forEach(el => el.remove());
+
+  const addBtn = document.getElementById('btn-add-tab');
+  const availableWidth = tabBar.clientWidth - 44; // reserve space for + button
+  const defaultWidth   = 160;
+  const minWidth       = 40;
+  const tabWidth       = Math.max(minWidth, Math.min(defaultWidth, Math.floor(availableWidth / tabs.length)));
+  const isTruncated    = tabWidth <= minWidth;
+
+  tabs.forEach(tab => {
+    const el = document.createElement('div');
+    el.className  = 'tab' + (tab.id === activeTabId ? ' active' : '');
+    el.dataset.tabId = tab.id;
+    el.style.width   = tabWidth + 'px';
+
+    const nameEl = document.createElement('span');
+    nameEl.className   = 'tab-name';
+    nameEl.textContent = tab.name;
+    nameEl.title       = tab.name;
+    el.appendChild(nameEl);
+
+    // ✕ button: only when multiple tabs exist;
+    // when truncated, only show on the active tab
+    if (tabs.length > 1 && (tab.id === activeTabId || !isTruncated)) {
+      const closeBtn = document.createElement('button');
+      closeBtn.className   = 'tab-close';
+      closeBtn.textContent = '✕';
+      closeBtn.title       = 'Close tab';
+      closeBtn.addEventListener('click', e => { e.stopPropagation(); closeTab(tab.id); });
+      el.appendChild(closeBtn);
+    }
+
+    el.addEventListener('click', () => switchTab(tab.id));
+    tabBar.insertBefore(el, addBtn);
+  });
+
+  // Keep title in sync
+  const active = tabs.find(t => t.id === activeTabId);
+  if (active) document.getElementById('map-title').textContent = active.name;
+}
+
+// ── RENAME via double-click on toolbar title ──
+document.getElementById('map-title').addEventListener('dblclick', startRename);
+
+function startRename() {
+  const titleEl = document.getElementById('map-title');
+  const inputEl = document.getElementById('map-title-input');
+  const tab     = tabs.find(t => t.id === activeTabId);
+  inputEl.value      = tab ? tab.name : '';
+  inputEl.style.display = 'block';
+  titleEl.style.visibility = 'hidden';
+  inputEl.focus();
+  inputEl.select();
+}
+
+function commitRename() {
+  const titleEl = document.getElementById('map-title');
+  const inputEl = document.getElementById('map-title-input');
+  const newName = inputEl.value.trim();
+  const tab     = tabs.find(t => t.id === activeTabId);
+  if (tab && newName) tab.name = newName;
+  inputEl.style.display = 'none';
+  titleEl.style.visibility = 'visible';
+  renderTabBar();
+}
+
+document.getElementById('map-title-input').addEventListener('blur', commitRename);
+document.getElementById('map-title-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter')  { document.getElementById('map-title-input').blur(); }
+  if (e.key === 'Escape') {
+    e.stopPropagation();
+    document.getElementById('map-title-input').value = '';
+    document.getElementById('map-title-input').blur();
+  }
+});
+
+document.getElementById('btn-add-tab').addEventListener('click', () => createTab());
+
+// ─────────────────────────────────────────────
+//  NODE COLOR
+// ─────────────────────────────────────────────
+function applyNodeColor(el, colorIdx) {
+  const c = COLOR_PRESETS[colorIdx ?? 0] ?? COLOR_PRESETS[0];
+  el.style.borderColor = c.border;
+  el.style.boxShadow   = `0 0 12px ${c.border}33, inset 0 0 20px #0a00001a`;
+  const nameEl = el.querySelector('.node-name');
+  if (nameEl) nameEl.style.color = c.text;
+}
+
+// ─────────────────────────────────────────────
+//  UNDO
+// ─────────────────────────────────────────────
+function pushUndo() {
+  undoStack.push({
+    nodes:       nodes.map(n => ({ ...n })),
+    connections: connections.map(c => ({ ...c })),
+    nextId
+  });
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = []; // any new action clears redo history
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  // Save current state to redo stack before restoring
+  redoStack.push({
+    nodes:       nodes.map(n => ({ ...n })),
+    connections: connections.map(c => ({ ...c })),
+    nextId
+  });
+  const snap = undoStack.pop();
+  document.querySelectorAll('.node').forEach(el => el.remove());
+  nodes       = snap.nodes;
+  connections = snap.connections;
+  nextId      = snap.nextId;
+  nodes.forEach(node => createNodeEl(node));
+  redrawLines();
+  if (selectedNodeId) {
+    if (nodes.find(n => n.id === selectedNodeId)) openDetailPanel(selectedNodeId);
+    else closeDetailPanel();
+  }
+  saveCurrentTab();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  // Save current state to undo stack before restoring
+  undoStack.push({
+    nodes:       nodes.map(n => ({ ...n })),
+    connections: connections.map(c => ({ ...c })),
+    nextId
+  });
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  const snap = redoStack.pop();
+  document.querySelectorAll('.node').forEach(el => el.remove());
+  nodes       = snap.nodes;
+  connections = snap.connections;
+  nextId      = snap.nextId;
+  nodes.forEach(node => createNodeEl(node));
+  redrawLines();
+  if (selectedNodeId) {
+    if (nodes.find(n => n.id === selectedNodeId)) openDetailPanel(selectedNodeId);
+    else closeDetailPanel();
+  }
+  saveCurrentTab();
+}
+
+// ─────────────────────────────────────────────
+//  UTILITIES
+// ─────────────────────────────────────────────
+function uid() { return 'n' + (nextId++); }
+function cuid() { return 'c' + Date.now() + Math.random().toString(36).slice(2,6); }
+
+function applyTransform() {
+  world.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+  zoomVal.textContent = Math.round(scale * 100);
+}
+
+function screenToWorld(sx, sy) {
+  const rect = viewport.getBoundingClientRect();
+  return {
+    x: (sx - rect.left - panX) / scale,
+    y: (sy - rect.top  - panY) / scale
+  };
+}
+
+function getNodeCenter(node) {
+  const el = document.getElementById('node-' + node.id);
+  if (!el) return { x: node.x, y: node.y };
+  return {
+    x: node.x + el.offsetWidth / 2,
+    y: node.y + el.offsetHeight / 2
+  };
+}
+
+// ─────────────────────────────────────────────
+//  NODE RENDERING
+// ─────────────────────────────────────────────
+function createNodeEl(node) {
+  const el = document.createElement('div');
+  el.className = 'node';
+  el.id = 'node-' + node.id;
+  el.style.left = node.x + 'px';
+  el.style.top  = node.y + 'px';
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'node-name';
+  nameEl.textContent = node.name;
+  el.appendChild(nameEl);
+
+  applyNodeColor(el, node.color ?? 0);
+
+  // Hover tooltip
+  el.addEventListener('mouseenter', () => {
+    if (connectMode) return;
+    if (node.desc) {
+      tooltip.textContent = node.desc;
+      tooltip.classList.add('visible');
+    }
+  });
+  el.addEventListener('mousemove', (e) => {
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top  = (e.clientY - 10) + 'px';
+  });
+  el.addEventListener('mouseleave', () => {
+    tooltip.classList.remove('visible');
+  });
+
+  // Click / drag
+  el.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    tooltip.classList.remove('visible');
+
+    if (connectMode) {
+      handleConnectClick(node.id);
+      return;
+    }
+
+    // Capture pre-drag snapshot — only committed to undo stack if node actually moves
+    pendingUndoSnap = {
+      nodes:       nodes.map(n => ({ ...n })),
+      connections: connections.map(c => ({ ...c })),
+      nextId
+    };
+    const w = screenToWorld(e.clientX, e.clientY);
+    dragStartX = node.x;
+    dragStartY = node.y;
+    draggingNode = node.id;
+    dragOffX = w.x - node.x;
+    dragOffY = w.y - node.y;
+    el.style.zIndex = 20;
+  });
+
+  el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (connectMode) return;
+    openDetailPanel(node.id);
+  });
+
+  world.appendChild(el);
+  return el;
+}
+
+function addNode(name, desc, logic, x, y) {
+  const node = { id: uid(), name, desc, logic, x, y, color: 0 };
+  nodes.push(node);
+  createNodeEl(node);
+  redrawLines();
+  return node;
+}
+
+function updateNodeEl(node) {
+  const el = document.getElementById('node-' + node.id);
+  if (!el) return;
+  el.querySelector('.node-name').textContent = node.name;
+}
+
+function removeNodeEl(id) {
+  const el = document.getElementById('node-' + id);
+  if (el) el.remove();
+}
+
+// ─────────────────────────────────────────────
+//  LINE RENDERING
+// ─────────────────────────────────────────────
+
+// Returns the point on node's rectangular border closest to (targetX, targetY)
+function getNodeBorderPoint(node, targetX, targetY) {
+  const el = document.getElementById('node-' + node.id);
+  const w = el ? el.offsetWidth  : 160;
+  const h = el ? el.offsetHeight : 50;
+  const cx = node.x + w / 2;
+  const cy = node.y + h / 2;
+  const dx = targetX - cx;
+  const dy = targetY - cy;
+  if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return { x: cx, y: cy };
+  // Half-extents with a small gap so the line doesn't overlap the border stroke
+  const hw = w / 2 + 3;
+  const hh = h / 2 + 3;
+  // Find smallest positive t where the ray cx+t*dx, cy+t*dy hits a side
+  const tx1 =  hw / Math.abs(dx || 1e-9);
+  const ty1 =  hh / Math.abs(dy || 1e-9);
+  const t = Math.min(tx1, ty1);
+  return { x: cx + dx * t, y: cy + dy * t };
+}
+
+// Draw a filled arrowhead triangle at point (x,y) pointing in direction (angle radians)
+function makeArrowhead(x, y, angle) {
+  const size = 9;
+  const spread = 0.42; // half-angle in radians (~24 degrees)
+  const x1 = x + Math.cos(angle + Math.PI - spread) * size;
+  const y1 = y + Math.sin(angle + Math.PI - spread) * size;
+  const x2 = x + Math.cos(angle + Math.PI + spread) * size;
+  const y2 = y + Math.sin(angle + Math.PI + spread) * size;
+  const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  poly.setAttribute('points', `${x},${y} ${x1},${y1} ${x2},${y2}`);
+  poly.setAttribute('class', 'dep-arrow');
+  return poly;
+}
+
+function redrawLines() {
+  svgLayer.querySelectorAll('.dep-line, .dep-arrow, .dep-label-group').forEach(e => e.remove());
+
+  connections.forEach(conn => {
+    const fromNode = nodes.find(n => n.id === conn.from);
+    const toNode   = nodes.find(n => n.id === conn.to);
+    if (!fromNode || !toNode) return;
+
+    const fc = getNodeCenter(fromNode);
+    const tc = getNodeCenter(toNode);
+    const sp = getNodeBorderPoint(fromNode, tc.x, tc.y);
+    const ep = getNodeBorderPoint(toNode,   fc.x, fc.y);
+
+    const mx  = (sp.x + ep.x) / 2;
+    const my  = (sp.y + ep.y) / 2;
+    const ddx = ep.x - sp.x;
+    const ddy = ep.y - sp.y;
+    const cpx = mx - ddy * 0.12;
+    const cpy = my + ddx * 0.12;
+
+    // Line
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${sp.x} ${sp.y} Q ${cpx} ${cpy} ${ep.x} ${ep.y}`);
+    path.setAttribute('class', 'dep-line');
+    path.dataset.connId = conn.id;
+    svgLayer.appendChild(path);
+
+    // Arrowhead
+    const angle = Math.atan2(ep.y - cpy, ep.x - cpx);
+    svgLayer.appendChild(makeArrowhead(ep.x, ep.y, angle));
+
+    // Connection label
+    if (conn.label) {
+      const lx = 0.25 * sp.x + 0.5 * cpx + 0.25 * ep.x;
+      const ly = 0.25 * sp.y + 0.5 * cpy + 0.25 * ep.y;
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('class', 'dep-label-group');
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.textContent = conn.label;
+      text.setAttribute('x', lx);
+      text.setAttribute('y', ly);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'middle');
+      g.appendChild(text);
+      svgLayer.appendChild(g);
+      try {
+        const bb = text.getBBox();
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', bb.x - 4);
+        rect.setAttribute('y', bb.y - 2);
+        rect.setAttribute('width',  bb.width  + 8);
+        rect.setAttribute('height', bb.height + 4);
+        rect.setAttribute('rx', 3);
+        g.insertBefore(rect, text);
+      } catch(_) {}
+    }
+  });
+}
+
+// Preview line during connect mode
+let previewLine = null;
+function showPreviewLine(x1, y1, x2, y2) {
+  if (!previewLine) {
+    previewLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    previewLine.setAttribute('class', 'dep-line-preview');
+    svgLayer.appendChild(previewLine);
+  }
+  previewLine.setAttribute('x1', x1);
+  previewLine.setAttribute('y1', y1);
+  previewLine.setAttribute('x2', x2);
+  previewLine.setAttribute('y2', y2);
+}
+function hidePreviewLine() {
+  if (previewLine) { previewLine.remove(); previewLine = null; }
+}
+
+// ─────────────────────────────────────────────
+//  CONNECT MODE
+// ─────────────────────────────────────────────
+function setConnectMode(on) {
+  connectMode = on;
+  connectSource = null;
+  hidePreviewLine();
+  document.querySelectorAll('.node').forEach(el => el.classList.remove('connect-source'));
+  document.getElementById('btn-connect').classList.toggle('active', on);
+  viewport.classList.toggle('connect-mode', on);
+  modeText.textContent = on ? 'CONNECT — CLICK SOURCE NODE' : 'PAN / SELECT';
+}
+
+function handleConnectClick(nodeId) {
+  if (!connectSource) {
+    connectSource = nodeId;
+    document.getElementById('node-' + nodeId).classList.add('connect-source');
+    modeText.textContent = 'CONNECT — CLICK TARGET NODE';
+  } else if (connectSource === nodeId) {
+    showToast("Can't connect a node to itself");
+  } else {
+    const exists = connections.some(c => c.from === connectSource && c.to === nodeId);
+    if (!exists) {
+      pushUndo();
+      connections.push({ id: cuid(), from: connectSource, to: nodeId });
+      redrawLines();
+      if (selectedNodeId) openDetailPanel(selectedNodeId);
+    } else {
+      showToast('Connection already exists');
+    }
+    document.getElementById('node-' + connectSource)?.classList.remove('connect-source');
+    connectSource = null;
+    hidePreviewLine();
+    modeText.textContent = 'CONNECT — CLICK SOURCE NODE';
+    // Stay in connect mode for chaining
+  }
+}
+
+// ─────────────────────────────────────────────
+//  DETAIL PANEL
+// ─────────────────────────────────────────────
+function openDetailPanel(id) {
+  const node = nodes.find(n => n.id === id);
+  if (!node) return;
+  selectedNodeId = id;
+
+  document.querySelectorAll('.node').forEach(el => el.classList.remove('selected'));
+  document.getElementById('node-' + id)?.classList.add('selected');
+
+  document.getElementById('panel-title').textContent = node.name;
+  const descEl = document.getElementById('panel-desc');
+  const logicEl = document.getElementById('panel-logic');
+  descEl.textContent  = node.desc  || '(no description)';
+  logicEl.textContent = node.logic || '(no logic notes)';
+  descEl.classList.toggle('empty',  !node.desc);
+  logicEl.classList.toggle('empty', !node.logic);
+
+  // Color swatches
+  const colorsEl = document.getElementById('panel-colors');
+  colorsEl.innerHTML = '';
+  COLOR_PRESETS.forEach((preset, idx) => {
+    const swatch = document.createElement('button');
+    swatch.className = 'color-swatch' + ((node.color ?? 0) === idx ? ' active' : '');
+    swatch.style.background = preset.border;
+    swatch.title = preset.name;
+    swatch.addEventListener('click', () => {
+      if ((node.color ?? 0) === idx) return;
+      pushUndo();
+      node.color = idx;
+      const nodeEl = document.getElementById('node-' + node.id);
+      if (nodeEl) applyNodeColor(nodeEl, idx);
+      colorsEl.querySelectorAll('.color-swatch').forEach((s, i) => s.classList.toggle('active', i === idx));
+      saveCurrentTab();
+    });
+    colorsEl.appendChild(swatch);
+  });
+
+  // Deps
+  const depsEl = document.getElementById('panel-deps');
+  depsEl.innerHTML = '';
+  const outgoing = connections.filter(c => c.from === id);
+  if (outgoing.length === 0) {
+    depsEl.innerHTML = '<div class="panel-text empty">(no dependencies)</div>';
+  } else {
+    outgoing.forEach(conn => {
+      const target = nodes.find(n => n.id === conn.to);
+      if (!target) return;
+      const chip = document.createElement('div');
+      chip.className = 'dep-chip';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'dep-chip-name';
+      nameSpan.textContent = target.name;
+      chip.appendChild(nameSpan);
+
+      let origLabel = '';
+      const labelInput = document.createElement('input');
+      labelInput.className   = 'dep-label-input';
+      labelInput.type        = 'text';
+      labelInput.placeholder = 'label…';
+      labelInput.value       = conn.label || '';
+      labelInput.title       = 'Connection label (shown on arrow)';
+      labelInput.addEventListener('focus', () => { origLabel = conn.label || ''; });
+      labelInput.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter')  { ev.preventDefault(); labelInput.blur(); }
+        if (ev.key === 'Escape') { ev.stopPropagation(); labelInput.value = origLabel; labelInput.blur(); }
+      });
+      labelInput.addEventListener('blur', () => {
+        const newLabel = labelInput.value.trim();
+        if (newLabel !== origLabel) {
+          pushUndo();
+          conn.label = newLabel || undefined;
+          redrawLines();
+        }
+      });
+      chip.appendChild(labelInput);
+
+      const rm = document.createElement('button');
+      rm.className = 'dep-remove';
+      rm.textContent = '✕';
+      rm.title = 'Remove connection';
+      rm.addEventListener('click', (e) => {
+        e.stopPropagation();
+        pushUndo();
+        connections = connections.filter(c => c.id !== conn.id);
+        redrawLines();
+        openDetailPanel(id);
+      });
+      chip.appendChild(rm);
+      depsEl.appendChild(chip);
+    });
+  }
+
+  // Dependents
+  const dependentsEl = document.getElementById('panel-dependents');
+  dependentsEl.innerHTML = '';
+  const incoming = connections.filter(c => c.to === id);
+  if (incoming.length === 0) {
+    dependentsEl.innerHTML = '<div class="panel-text empty">(no dependents)</div>';
+  } else {
+    incoming.forEach(conn => {
+      const source = nodes.find(n => n.id === conn.from);
+      if (!source) return;
+      const chip = document.createElement('div');
+      chip.className = 'dep-chip dependent-chip';
+      chip.textContent = source.name;
+      dependentsEl.appendChild(chip);
+    });
+  }
+
+  detailPanel.classList.add('open');
+}
+
+function closeDetailPanel() {
+  detailPanel.classList.remove('open');
+  document.querySelectorAll('.node').forEach(el => el.classList.remove('selected'));
+  selectedNodeId = null;
+}
+
+document.getElementById('panel-close').addEventListener('click', closeDetailPanel);
+
+document.getElementById('panel-btn-edit').addEventListener('click', () => {
+  if (!selectedNodeId) return;
+  openModal(selectedNodeId);
+});
+
+document.getElementById('panel-btn-delete').addEventListener('click', () => {
+  if (!selectedNodeId) return;
+  deleteNode(selectedNodeId);
+});
+
+// ─────────────────────────────────────────────
+//  MODAL
+// ─────────────────────────────────────────────
+let modalEditId = null;
+
+function openModal(editId = null) {
+  document.getElementById('modal-title').textContent = editId ? 'Edit Node' : 'Add Node';
+  if (editId) {
+    const node = nodes.find(n => n.id === editId);
+    if (!node) return;
+    modalEditId = editId;
+    document.getElementById('field-name').value  = node.name;
+    document.getElementById('field-desc').value  = node.desc;
+    document.getElementById('field-logic').value = node.logic;
+  } else {
+    modalEditId = null;
+    document.getElementById('field-name').value  = '';
+    document.getElementById('field-desc').value  = '';
+    document.getElementById('field-logic').value = '';
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('field-name').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  modalEditId = null;
+  if (document.activeElement) document.activeElement.blur();
+}
+
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+document.getElementById('modal-overlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+document.getElementById('modal-save').addEventListener('click', () => {
+  const name  = document.getElementById('field-name').value.trim();
+  const desc  = document.getElementById('field-desc').value.trim();
+  const logic = document.getElementById('field-logic').value.trim();
+  if (!name) { document.getElementById('field-name').focus(); return; }
+  pushUndo();
+
+  if (modalEditId) {
+    const node = nodes.find(n => n.id === modalEditId);
+    if (!node) { closeModal(); return; }
+    node.name = name; node.desc = desc; node.logic = logic;
+    updateNodeEl(node);
+    if (selectedNodeId === modalEditId) openDetailPanel(modalEditId);
+  } else {
+    // Place near center of current view, accounting for toolbar offset
+    const rect = viewport.getBoundingClientRect();
+    const cx = (-panX + rect.width  * 0.5) / scale - 90;
+    const cy = (-panY + rect.height * 0.5) / scale - 30;
+    const jx = cx + (Math.random() - 0.5) * 120;
+    const jy = cy + (Math.random() - 0.5) * 80;
+    addNode(name, desc, logic, jx, jy);
+  }
+  closeModal();
+});
+
+// ─────────────────────────────────────────────
+//  DELETE NODE
+// ─────────────────────────────────────────────
+function deleteNode(id) {
+  if (!confirm('Delete this node and all its connections?')) return;
+  pushUndo();
+  nodes = nodes.filter(n => n.id !== id);
+  connections = connections.filter(c => c.from !== id && c.to !== id);
+  removeNodeEl(id);
+  redrawLines();
+  closeDetailPanel();
+}
+
+// ─────────────────────────────────────────────
+//  PANNING
+// ─────────────────────────────────────────────
+viewport.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (connectMode) return;
+  isPanning = true;
+  panStartX = e.clientX;
+  panStartY = e.clientY;
+  panOriginX = panX;
+  panOriginY = panY;
+  viewport.classList.add('grabbing');
+});
+
+window.addEventListener('mousemove', (e) => {
+  // Update world mouse pos
+  const w = screenToWorld(e.clientX, e.clientY);
+  mouseWorldX = w.x;
+  mouseWorldY = w.y;
+
+  // Connect preview
+  if (connectMode && connectSource) {
+    const srcNode = nodes.find(n => n.id === connectSource);
+    if (srcNode) {
+      const sc = getNodeCenter(srcNode);
+      showPreviewLine(sc.x, sc.y, mouseWorldX, mouseWorldY);
+    }
+  }
+
+  // Drag node
+  if (draggingNode) {
+    const node = nodes.find(n => n.id === draggingNode);
+    if (node) {
+      node.x = mouseWorldX - dragOffX;
+      node.y = mouseWorldY - dragOffY;
+      const el = document.getElementById('node-' + node.id);
+      if (el) { el.style.left = node.x + 'px'; el.style.top = node.y + 'px'; }
+      redrawLines();
+    }
+    return;
+  }
+
+  // Pan
+  if (isPanning) {
+    panX = panOriginX + (e.clientX - panStartX);
+    panY = panOriginY + (e.clientY - panStartY);
+    applyTransform();
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  if (draggingNode) {
+    const movedNode = nodes.find(n => n.id === draggingNode);
+    if (movedNode && pendingUndoSnap &&
+        (movedNode.x !== dragStartX || movedNode.y !== dragStartY)) {
+      undoStack.push(pendingUndoSnap);
+      if (undoStack.length > MAX_UNDO) undoStack.shift();
+      redoStack = [];
+      saveCurrentTab();
+    }
+    pendingUndoSnap = null;
+    const el = document.getElementById('node-' + draggingNode);
+    if (el) el.style.zIndex = '';
+    draggingNode = null;
+  }
+  isPanning = false;
+  viewport.classList.remove('grabbing');
+});
+
+// ─────────────────────────────────────────────
+//  ZOOM
+// ─────────────────────────────────────────────
+viewport.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const step = 0.05; // 5% per scroll tick
+  const direction = e.deltaY > 0 ? -1 : 1;
+  // Round current scale to nearest step first to avoid drift, then add one step
+  const snapped = Math.round(scale / step) * step;
+  const newScale = Math.min(Math.max(snapped + direction * step, 0.20), 3.00);
+  // Round to 2 decimal places to avoid floating point noise
+  const cleanScale = Math.round(newScale / step) * step;
+
+  // Zoom toward cursor
+  const rect = viewport.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  panX = cx - (cx - panX) * (cleanScale / scale);
+  panY = cy - (cy - panY) * (cleanScale / scale);
+  scale = cleanScale;
+  applyTransform();
+}, { passive: false });
+
+// Click on background deselects
+viewport.addEventListener('click', (e) => {
+  if (e.target === viewport || e.target === world) {
+    if (connectMode) {
+      setConnectMode(false);
+      return;
+    }
+    closeDetailPanel();
+  }
+});
+
+// ─────────────────────────────────────────────
+//  TOOLBAR BUTTONS
+// ─────────────────────────────────────────────
+document.getElementById('btn-add').addEventListener('click', () => {
+  if (connectMode) setConnectMode(false);
+  openModal();
+});
+
+document.getElementById('btn-connect').addEventListener('click', () => {
+  setConnectMode(!connectMode);
+});
+
+document.getElementById('btn-recenter').addEventListener('click', () => {
+  if (nodes.length === 0) {
+    // No nodes — just center the origin
+    panX = viewport.clientWidth  / 2 - 3000 * scale;
+    panY = viewport.clientHeight / 2 - 3000 * scale;
+  } else {
+    // Find bounding box of all nodes
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+      const el = document.getElementById('node-' + n.id);
+      const w = el ? el.offsetWidth  : 160;
+      const h = el ? el.offsetHeight : 50;
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + w);
+      maxY = Math.max(maxY, n.y + h);
+    });
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    panX = viewport.clientWidth  / 2 - cx * scale;
+    panY = viewport.clientHeight / 2 - cy * scale;
+  }
+  applyTransform();
+});
+
+document.getElementById('btn-reset-zoom').addEventListener('click', () => {
+  // Zoom to 100% keeping viewport center fixed
+  const cx = viewport.clientWidth  / 2;
+  const cy = viewport.clientHeight / 2;
+  panX = cx - (cx - panX) * (1 / scale);
+  panY = cy - (cy - panY) * (1 / scale);
+  scale = 1;
+  applyTransform();
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (!confirm('Clear all nodes and connections?')) return;
+  pushUndo();
+  nodes = [];
+  connections = [];
+  nextId = 1;
+  document.querySelectorAll('.node').forEach(el => el.remove());
+  redrawLines();
+  closeDetailPanel();
+  saveCurrentTab();
+});
+
+// ─────────────────────────────────────────────
+//  EXPORT / IMPORT
+// ─────────────────────────────────────────────
+document.getElementById('btn-export').addEventListener('click', () => {
+  const tab  = tabs.find(t => t.id === activeTabId);
+  const data = {
+    version: 1,
+    name: tab ? tab.name : 'Map',
+    nextId,
+    nodes: nodes.map(n => ({ ...n })),
+    connections: connections.map(c => ({ ...c }))
+  };
+  const blob     = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url      = URL.createObjectURL(blob);
+  const a        = document.createElement('a');
+  a.href         = url;
+  a.download     = (tab ? tab.name.replace(/[^a-zA-Z0-9]/g, '-') : 'system-map') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('btn-import').addEventListener('click', () => {
+  document.getElementById('import-input').click();
+});
+
+document.getElementById('import-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      loadData(data);
+    } catch {
+      alert('Invalid JSON file.');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+function loadData(data) {
+  pushUndo();
+  document.querySelectorAll('.node').forEach(el => el.remove());
+  closeDetailPanel();
+
+  nodes       = data.nodes || [];
+  connections = data.connections || [];
+  nextId      = data.nextId || (nodes.length + 1);
+
+  // Set tab name from imported JSON if present
+  if (data.name) {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (tab) tab.name = data.name;
+  }
+
+  nodes.forEach(node => createNodeEl(node));
+  redrawLines();
+  renderTabBar();
+}
+
+// ─────────────────────────────────────────────
+//  KEYBOARD SHORTCUTS
+// ─────────────────────────────────────────────
+window.addEventListener('keydown', (e) => {
+  const inInput  = document.activeElement &&
+    (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+  const modalOpen = document.getElementById('modal-overlay').classList.contains('open');
+
+  // ── Escape: always works ──
+  if (e.key === 'Escape') {
+    if (connectMode) { setConnectMode(false); return; }
+    if (modalOpen)   { closeModal(); return; }
+    closeDetailPanel();
+    return;
+  }
+
+  // ── Enter: confirm modal (not in textarea — allow newlines there) ──
+  if (e.key === 'Enter' && modalOpen && document.activeElement.tagName !== 'TEXTAREA') {
+    e.preventDefault();
+    document.getElementById('modal-save').click();
+    return;
+  }
+
+  // ── Block everything else while typing or modal open ──
+  if (inInput || modalOpen) return;
+
+  // ── Shift combos ──
+  if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    switch (e.key) {
+      case 'Z':
+        e.preventDefault();
+        undo();
+        return;
+      case 'Y':
+        e.preventDefault();
+        redo();
+        return;
+      case 'P':
+        e.preventDefault();
+        exportPNG();
+        return;
+      case 'E':
+        e.preventDefault();
+        document.getElementById('btn-export').click();
+        return;
+      case 'I':
+        e.preventDefault();
+        document.getElementById('btn-import').click();
+        return;
+      case 'T':
+        e.preventDefault();
+        createTab();
+        return;
+      case 'W':
+        e.preventDefault();
+        if (tabs.length <= 1) document.getElementById('btn-clear').click();
+        else closeTab(activeTabId);
+        return;
+      case 'ArrowRight':
+        e.preventDefault();
+        { const idx = tabs.findIndex(t => t.id === activeTabId);
+          if (idx < tabs.length - 1) switchTab(tabs[idx + 1].id); }
+        return;
+      case 'ArrowLeft':
+        e.preventDefault();
+        { const idx = tabs.findIndex(t => t.id === activeTabId);
+          if (idx > 0) switchTab(tabs[idx - 1].id); }
+        return;
+      case 'Delete': case 'Backspace':
+        e.preventDefault();
+        document.getElementById('btn-clear').click();
+        return;
+    }
+  }
+
+  // ── F2: rename tab ──
+  if (e.key === 'F2') {
+    e.preventDefault();
+    startRename();
+    return;
+  }
+
+  // ── Single-key shortcuts (no modifiers held) ──
+  if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    switch (e.key) {
+      case 'n': case 'N':
+        if (connectMode) setConnectMode(false);
+        openModal();
+        break;
+      case 'e': case 'E':
+        if (selectedNodeId) openModal(selectedNodeId);
+        break;
+      case 'Delete': case 'Backspace':
+        if (selectedNodeId) deleteNode(selectedNodeId);
+        break;
+      case 'c': case 'C':
+        setConnectMode(!connectMode);
+        break;
+      case 'r': case 'R':
+        document.getElementById('btn-recenter').click();
+        break;
+      case 'f': case 'F':
+        zoomToFit();
+        break;
+      case 'z': case 'Z':
+        document.getElementById('btn-reset-zoom').click();
+        break;
+    }
+  }
+});
+
+// ─────────────────────────────────────────────
+//  TOAST NOTIFICATIONS
+// ─────────────────────────────────────────────
+const toastContainer = document.getElementById('toast-container');
+
+function showToast(message) {
+  toastContainer.classList.toggle('panel-open', detailPanel.classList.contains('open'));
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  toastContainer.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'none';
+    void toast.offsetHeight; // force reflow so transition has a start value
+    toast.classList.add('fading');
+    setTimeout(() => toast.remove(), 800);
+  }, 2500);
+}
+
+// Keep toast container offset in sync with detail panel open/close
+new MutationObserver(() => {
+  toastContainer.classList.toggle('panel-open', detailPanel.classList.contains('open'));
+}).observe(detailPanel, { attributes: true, attributeFilter: ['class'] });
+
+// ─────────────────────────────────────────────
+//  ZOOM TO FIT
+// ─────────────────────────────────────────────
+function zoomToFit() {
+  if (nodes.length === 0) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach(n => {
+    const el = document.getElementById('node-' + n.id);
+    const w  = el ? el.offsetWidth  : 160;
+    const h  = el ? el.offsetHeight : 50;
+    minX = Math.min(minX, n.x);     minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + w); maxY = Math.max(maxY, n.y + h);
+  });
+  const pad  = 80;
+  const rect = viewport.getBoundingClientRect();
+  const scaleX   = rect.width  / (maxX - minX + pad * 2);
+  const scaleY   = rect.height / (maxY - minY + pad * 2);
+  const rawScale = Math.min(Math.max(Math.min(scaleX, scaleY), 0.20), 3.00);
+  scale = Math.round(rawScale / 0.05) * 0.05;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  panX = rect.width  / 2 - cx * scale;
+  panY = rect.height / 2 - cy * scale;
+  applyTransform();
+}
+
+// ─────────────────────────────────────────────
+//  EXPORT PNG
+// ─────────────────────────────────────────────
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function exportPNG() {
+  if (nodes.length === 0) { showToast('No nodes to export.'); return; }
+
+  const pad = 60;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach(n => {
+    const el = document.getElementById('node-' + n.id);
+    const w  = el ? el.offsetWidth  : 160;
+    const h  = el ? el.offsetHeight : 50;
+    minX = Math.min(minX, n.x);     minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + w); maxY = Math.max(maxY, n.y + h);
+  });
+  const cw   = Math.ceil(maxX - minX + pad * 2);
+  const ch   = Math.ceil(maxY - minY + pad * 2);
+  const offX = minX - pad;
+  const offY = minY - pad;
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#080808';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Dot grid aligned to world coordinates
+  const mod = (n, m) => ((n % m) + m) % m;
+  const gx0 = mod(40 - mod(offX, 40), 40);
+  const gy0 = mod(40 - mod(offY, 40), 40);
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  for (let x = gx0; x < cw; x += 40)
+    for (let y = gy0; y < ch; y += 40) {
+      ctx.beginPath();
+      ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+  // Connection lines, arrowheads, labels
+  connections.forEach(conn => {
+    const fromNode = nodes.find(n => n.id === conn.from);
+    const toNode   = nodes.find(n => n.id === conn.to);
+    if (!fromNode || !toNode) return;
+
+    const fc  = getNodeCenter(fromNode);
+    const tc  = getNodeCenter(toNode);
+    const sp  = getNodeBorderPoint(fromNode, tc.x, tc.y);
+    const ep  = getNodeBorderPoint(toNode,   fc.x, fc.y);
+    const mx  = (sp.x + ep.x) / 2;
+    const my  = (sp.y + ep.y) / 2;
+    const ddx = ep.x - sp.x;
+    const ddy = ep.y - sp.y;
+    const cpx = mx - ddy * 0.12;
+    const cpy = my + ddx * 0.12;
+
+    ctx.beginPath();
+    ctx.moveTo(sp.x - offX, sp.y - offY);
+    ctx.quadraticCurveTo(cpx - offX, cpy - offY, ep.x - offX, ep.y - offY);
+    ctx.strokeStyle = '#dd2525';
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+
+    const angle   = Math.atan2(ep.y - cpy, ep.x - cpx);
+    const size    = 9, spread = 0.42;
+    ctx.beginPath();
+    ctx.moveTo(ep.x - offX, ep.y - offY);
+    ctx.lineTo(ep.x - offX + Math.cos(angle + Math.PI - spread) * size,
+               ep.y - offY + Math.sin(angle + Math.PI - spread) * size);
+    ctx.lineTo(ep.x - offX + Math.cos(angle + Math.PI + spread) * size,
+               ep.y - offY + Math.sin(angle + Math.PI + spread) * size);
+    ctx.closePath();
+    ctx.fillStyle = '#dd2525';
+    ctx.fill();
+
+    if (conn.label) {
+      const lx = 0.25 * sp.x + 0.5 * cpx + 0.25 * ep.x - offX;
+      const ly = 0.25 * sp.y + 0.5 * cpy + 0.25 * ep.y - offY;
+      ctx.font = '10px monospace';
+      const tw = ctx.measureText(conn.label).width;
+      ctx.fillStyle = '#0d0505';
+      ctx.strokeStyle = '#331010';
+      ctx.lineWidth = 0.5;
+      roundRect(ctx, lx - tw / 2 - 4, ly - 7, tw + 8, 14, 3);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#dd2525';
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(conn.label, lx, ly);
+    }
+  });
+
+  // Nodes
+  nodes.forEach(n => {
+    const el = document.getElementById('node-' + n.id);
+    const w  = el ? el.offsetWidth  : 160;
+    const h  = el ? el.offsetHeight : 50;
+    const nx = n.x - offX;
+    const ny = n.y - offY;
+    const c  = COLOR_PRESETS[n.color ?? 0] ?? COLOR_PRESETS[0];
+
+    ctx.fillStyle   = '#111111';
+    ctx.strokeStyle = c.border;
+    ctx.lineWidth   = 1.5;
+    roundRect(ctx, nx, ny, w, h, 10);
+    ctx.fill(); ctx.stroke();
+
+    // Node name (truncate if too wide)
+    ctx.font = 'bold 13px "Rajdhani", sans-serif';
+    ctx.fillStyle    = c.text;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    let label = n.name;
+    while (ctx.measureText(label).width > w - 20 && label.length > 1) label = label.slice(0, -1);
+    if (label !== n.name) label += '…';
+    ctx.fillText(label, nx + w / 2, ny + h / 2);
+  });
+
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    const tab = tabs.find(t => t.id === activeTabId);
+    a.href     = url;
+    a.download = (tab ? tab.name.replace(/[^a-zA-Z0-9]/g, '-') : 'system-map') + '.png';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+
+document.getElementById('btn-export-png').addEventListener('click', exportPNG);
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+(function init() {
+  const rect = viewport.getBoundingClientRect();
+  const startPanX = rect.width  / 2 - 3000;
+  const startPanY = rect.height / 2 - 3000;
+
+  tabs = [{
+    id: 'tab1',
+    name: 'Map 1',
+    nodes: [], connections: [], nextId: 1,
+    panX: startPanX, panY: startPanY, scale: 1,
+    undoStack: [], redoStack: []
+  }];
+  activeTabId = 'tab1';
+  tabCounter  = 2;
+
+  nodes = []; connections = []; nextId = 1;
+  panX = startPanX; panY = startPanY; scale = 1;
+
+  renderTabBar();
+  applyTransform();
+})();
+</script>
+</body>
+</html>
